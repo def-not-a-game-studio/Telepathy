@@ -48,16 +48,18 @@ namespace Telepathy {
             size = 0;
 
             // buffer needs to be of Header + MaxMessageSize
-            if (payloadBuffer.Length != 4 + MaxMessageSize) {
+            if (payloadBuffer.Length != MaxMessageSize) {
                 Log.Error($"ReadMessageBlocking: payloadBuffer needs to be of size 4 + MaxMessageSize = {4 + MaxMessageSize} instead of {payloadBuffer.Length}");
                 return false;
             }
 
             // read header
-            if (stream.ReadSafely(payloadBuffer, 0, 2) == 0)
+            if (stream.ReadSafely(payloadBuffer, 0, 2) == 0) {
+                Log.Error($"ReadMessageBlocking: Not enough bytes on the stream to read header.");
                 return false;
+            }
 
-            short command = BitConverter.ToInt16(payloadBuffer, 0);
+            var command = BitConverter.ToInt16(payloadBuffer, 0);
             if (!knownPackets.ContainsKey(command)) {
                 Log.Error($"ReadMessageBlocking: Unknown packet received {command} (0x{command:x4})");
                 return false;
@@ -104,7 +106,7 @@ namespace Telepathy {
             //
             // IMPORTANT: DO NOT make this a member, otherwise every connection
             //            on the server would use the same buffer simulatenously
-            byte[] receiveBuffer = new byte[4 + MaxMessageSize];
+            byte[] receiveBuffer = new byte[MaxMessageSize];
 
             // absolutely must wrap with try/catch, otherwise thread exceptions
             // are silent
