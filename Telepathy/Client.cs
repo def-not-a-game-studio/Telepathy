@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Threading;
 
@@ -120,8 +121,7 @@ namespace Telepathy
         // => pass ClientState object. a new one is created for each new thread!
         // => avoids data races where an old dieing thread might still modify
         //    the current thread's state :/
-        static void ReceiveThreadFunction(ClientConnectionState state, string ip, int port, int MaxMessageSize, bool NoDelay, int SendTimeout, int ReceiveTimeout, int ReceiveQueueLimit)
-
+        static void ReceiveThreadFunction(ClientConnectionState state, string ip, int port, int MaxMessageSize, bool NoDelay, int SendTimeout, int ReceiveTimeout, int ReceiveQueueLimit, Dictionary<short, int> knownPackets)
         {
             Thread sendThread = null;
 
@@ -147,7 +147,7 @@ namespace Telepathy
 
                 // run the receive loop
                 // (receive pipe is shared across all loops)
-                ThreadFunctions.ReceiveLoop(0, state.client, MaxMessageSize, state.receivePipe, ReceiveQueueLimit);
+                ThreadFunctions.ReceiveLoop(0, state.client, MaxMessageSize, state.receivePipe, ReceiveQueueLimit, knownPackets);
             }
             catch (SocketException exception)
             {
@@ -195,7 +195,7 @@ namespace Telepathy
             state.client?.Close();
         }
 
-        public void Connect(string ip, int port)
+        public void Connect(string ip, int port, Dictionary<short,int> knownPackets)
         {
             // not if already started
             if (Connecting || Connected)
@@ -236,7 +236,7 @@ namespace Telepathy
             // -> this way we don't async client.BeginConnect, which seems to
             //    fail sometimes if we connect too many clients too fast
             state.receiveThread = new Thread(() => {
-                ReceiveThreadFunction(state, ip, port, MaxMessageSize, NoDelay, SendTimeout, ReceiveTimeout, ReceiveQueueLimit);
+                ReceiveThreadFunction(state, ip, port, MaxMessageSize, NoDelay, SendTimeout, ReceiveTimeout, ReceiveQueueLimit, knownPackets);
             });
             state.receiveThread.IsBackground = true;
             state.receiveThread.Start();

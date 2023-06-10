@@ -153,7 +153,7 @@ namespace Telepathy
                         {
                             // run the receive loop
                             // (receive pipe is shared across all loops)
-                            ThreadFunctions.ReceiveLoop(connectionId, client, MaxMessageSize, receivePipe, ReceiveQueueLimit);
+                            ThreadFunctions.ReceiveLoop(connectionId, client, MaxMessageSize, receivePipe, ReceiveQueueLimit, new Dictionary<short, int>());
 
                             // IMPORTANT: do NOT remove from clients after the
                             // thread ends. need to do it in Tick() so that the
