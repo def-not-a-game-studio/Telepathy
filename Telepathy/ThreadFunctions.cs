@@ -55,7 +55,7 @@ namespace Telepathy {
 
             // read header
             if (stream.ReadSafely(payloadBuffer, 0, 2) == 0) {
-                Log.Error($"ReadMessageBlocking: Not enough bytes on the stream to read header.");
+                size = -1;
                 return false;
             }
 
@@ -135,17 +135,21 @@ namespace Telepathy {
                     if (!ReadMessageBlocking(stream, MaxMessageSize,
                                              receiveBuffer,
                                              knownPackets,
-                                             out int size))
-                        // break instead of return so stream close still happens!
-                        break;
+                                             out int size)) {
+                        if (size == 0) {
+                            break;
+                        }
+                    }
 
-                    // create arraysegment for the read message
-                    ArraySegment<byte> message = new ArraySegment<byte>(receiveBuffer, 0, size);
+                    if (size > 0) {
+                        // create arraysegment for the read message
+                        var message = new ArraySegment<byte>(receiveBuffer, 0, size);
 
-                    // send to main thread via pipe
-                    // -> it'll copy the message internally so we can reuse the
-                    //    receive buffer for next read!
-                    receivePipe.Enqueue(connectionId, EventType.Data, message);
+                        // send to main thread via pipe
+                        // -> it'll copy the message internally so we can reuse the
+                        //    receive buffer for next read!
+                        receivePipe.Enqueue(connectionId, EventType.Data, message);   
+                    }
 
                     // disconnect if receive pipe gets too big for this connectionId.
                     // -> avoids ever growing queue memory if network is slower
