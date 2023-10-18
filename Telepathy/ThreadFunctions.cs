@@ -40,8 +40,8 @@ namespace Telepathy
         }
         // read message (via stream) blocking.
         // writes into byte[] and returns bytes written to avoid allocations.
-        public static bool ReadMessageBlocking(NetworkStream stream, int MaxMessageSize, byte[] headerBuffer, byte[] payloadBuffer, out int size)
-        {
+        public static bool ReadMessageBlocking(NetworkStream stream, int MaxMessageSize, byte[] headerBuffer, byte[] payloadBuffer, out short key, out short size) {
+            key = 0;
             size = 0;
 
             // buffer needs to be of Header + MaxMessageSize
@@ -54,9 +54,10 @@ namespace Telepathy
             // read exactly 4 bytes for header (blocking)
             if (!stream.ReadExactly(headerBuffer, 4))
                 return false;
-
-            // convert to int
-            size = Utils.BytesToIntBigEndian(headerBuffer);
+            
+            // read key and size
+            key = BitConverter.ToInt16(headerBuffer, 0);
+            size = BitConverter.ToInt16(headerBuffer, 2);
 
             // protect against allocation attacks. an attacker might send
             // multiple fake '2GB header' packets in a row, causing the server
@@ -118,7 +119,7 @@ namespace Telepathy
                 while (true)
                 {
                     // read the next message (blocking) or stop if stream closed
-                    if (!ReadMessageBlocking(stream, MaxMessageSize, headerBuffer, receiveBuffer, out int size))
+                    if (!ReadMessageBlocking(stream, MaxMessageSize, headerBuffer, receiveBuffer, out short key, out short size))
                         // break instead of return so stream close still happens!
                         break;
 
