@@ -15,6 +15,9 @@ using System.Threading;
 
 namespace Telepathy
 {
+    using System.IO;
+    using System.Linq;
+
     public static class ThreadFunctions
     {
         // send message (via stream) with the <size,content> message structure
@@ -40,7 +43,8 @@ namespace Telepathy
         }
         // read message (via stream) blocking.
         // writes into byte[] and returns bytes written to avoid allocations.
-        public static bool ReadMessageBlocking(NetworkStream stream, int MaxMessageSize, byte[] headerBuffer, byte[] payloadBuffer, out short key, out short size) {
+        public static bool ReadMessageBlocking(NetworkStream stream, int MaxMessageSize, byte[] headerBuffer, byte[] payloadBuffer, out short key, out short size)
+        {
             key = 0;
             size = 0;
 
@@ -54,7 +58,7 @@ namespace Telepathy
             // read exactly 4 bytes for header (blocking)
             if (!stream.ReadExactly(headerBuffer, 4))
                 return false;
-            
+
             // read key and size
             key = BitConverter.ToInt16(headerBuffer, 0);
             size = BitConverter.ToInt16(headerBuffer, 2);
@@ -124,12 +128,13 @@ namespace Telepathy
                         break;
 
                     // create arraysegment for the read message
-                    ArraySegment<byte> message = new ArraySegment<byte>(receiveBuffer, 0, size);
+                    var header = new ArraySegment<byte>(headerBuffer, 0, 4);
+                    var message = new ArraySegment<byte>(receiveBuffer, 0, size);
 
                     // send to main thread via pipe
                     // -> it'll copy the message internally so we can reuse the
                     //    receive buffer for next read!
-                    receivePipe.Enqueue(connectionId, EventType.Data, message);
+                    receivePipe.Enqueue(connectionId, EventType.Data, new ArraySegment<byte>(header.Concat(message).ToArray()));
 
                     // disconnect if receive pipe gets too big for this connectionId.
                     // -> avoids ever growing queue memory if network is slower
@@ -189,7 +194,7 @@ namespace Telepathy
 
             try
             {
-                while (client.Connected) // try this. client will get closed eventually.
+                while (client.Connected)// try this. client will get closed eventually.
                 {
                     // reset ManualResetEvent before we do anything else. this
                     // way there is no race condition. if Send() is called again
@@ -197,7 +202,7 @@ namespace Telepathy
                     // -> otherwise Send might be called right after dequeue but
                     //    before .Reset, which would completely ignore it until
                     //    the next Send call.
-                    sendPending.Reset(); // WaitOne() blocks until .Set() again
+                    sendPending.Reset();// WaitOne() blocks until .Set() again
 
                     // dequeue & serialize all
                     // a locked{} TryDequeueAll is twice as fast as
